@@ -1,0 +1,10 @@
+# Time Logger Dependencies
+# Install with: pip install -r requirements.txt
+
+# Jira API client
+atlassian-python-api>=3.41.0
+
+# Environment variable management
+python-dotenv>=1.0.0
+
+# Note: tkinter ships with Python - no pip install needed
