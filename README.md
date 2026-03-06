@@ -58,11 +58,17 @@ python time_logger.py  # Open the app manually
 python setup.py install
 ```
 
+Or customize the reminder time:
+
+```bash
+python setup.py install --time 4:30PM
+```
+
 This creates two Windows scheduled tasks:
 | Task | Schedule | What it does |
 |------|----------|--------------|
-| TimeLogger-Daily | 3:00 PM, Mon-Fri | Opens the time entry popup |
-| TimeLogger-WeeklySummary | 4:00 PM, Fridays | Shows your weekly stats |
+| TimeLogger-Daily | 3:00 PM Mon-Fri (or custom) | Opens the time entry popup |
+| TimeLogger-WeeklySummary | 4:00 PM Fridays | Shows your weekly stats |
 
 ## Usage
 
@@ -158,6 +164,13 @@ If tasks exist but aren't running:
 - Ensure Python is in your system PATH
 
 ### Want to change the popup time?
+
+Easiest way—reinstall with a new time:
+```bash
+python setup.py install --time 4:30PM
+```
+
+Or manually:
 1. Open Task Scheduler (`taskschd.msc`)
 2. Find "TimeLogger-Daily"
 3. Edit the trigger to your preferred time
