@@ -45,7 +45,7 @@ pip install -r requirements.txt
    - `JIRA_EMAIL` - Your Arcadia email
    - `JIRA_API_TOKEN` - Generate one at https://id.atlassian.com/manage-profile/security/api-tokens
 
-### 4. Test It Works
+### 4. Test It
 
 ```bash
 python setup.py test   # Verify Jira connection
