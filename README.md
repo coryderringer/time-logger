@@ -23,30 +23,36 @@ Time Logger is a lightweight popup that:
 
 ## Quick Start
 
-### 1. Install Dependencies
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/coryderringer/time-logger.git
+cd time-logger
+```
+
+### 2. Install Dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2. Configure Jira Credentials
+### 3. Configure Jira Credentials
 
-```bash
-copy .env.example .env
-notepad .env  # Fill in your JIRA_URL, JIRA_EMAIL, and JIRA_API_TOKEN
-```
+1. In the `time-logger` folder, find the file `.env.example`
+2. Copy it and save the copy as `.env`
+3. Open `.env` in a text editor and fill in:
+   - `JIRA_URL` - Already set to Arcadia's Jira
+   - `JIRA_EMAIL` - Your Arcadia email
+   - `JIRA_API_TOKEN` - Generate one at https://id.atlassian.com/manage-profile/security/api-tokens
 
-You'll need a Jira API token. Generate one at:  
-https://id.atlassian.com/manage-profile/security/api-tokens
-
-### 3. Test It Works
+### 4. Test It Works
 
 ```bash
 python setup.py test   # Verify Jira connection
 python time_logger.py  # Open the app manually
 ```
 
-### 4. Set Up Daily Reminders
+### 5. Set Up Daily Reminders
 
 ```bash
 python setup.py install
