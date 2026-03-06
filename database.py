@@ -55,6 +55,15 @@ def init_db():
         )
     """)
     
+    # Excused days (PTO, holidays) - don't break streaks
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS excused_days (
+            date TEXT PRIMARY KEY,
+            reason TEXT NOT NULL,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    
     conn.commit()
     conn.close()
 
@@ -151,10 +160,91 @@ def delete_entry(entry_id: int):
     conn.close()
 
 
+def add_excused_day(date: str, reason: str):
+    """
+    Mark a day as excused (PTO, holiday, etc.) so it doesn't break streaks.
+    
+    Args:
+        date: Date string in YYYY-MM-DD format
+        reason: One of 'PTO', 'Holiday', or custom reason
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute("""
+        INSERT OR REPLACE INTO excused_days (date, reason) VALUES (?, ?)
+    """, (date, reason))
+    
+    conn.commit()
+    conn.close()
+
+
+def get_excused_days() -> set[str]:
+    """Get all excused dates as a set of date strings."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute("SELECT date FROM excused_days")
+    rows = cursor.fetchall()
+    conn.close()
+    
+    return set(row['date'] for row in rows)
+
+
+def get_missed_days() -> list[str]:
+    """
+    Get weekdays between last logged day and today that aren't logged or excused.
+    These are days that would break the streak.
+    
+    Returns:
+        List of date strings (YYYY-MM-DD) for missed days, oldest first
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+    
+    # Get logged dates
+    cursor.execute("SELECT date FROM daily_logs ORDER BY date DESC")
+    logged_rows = cursor.fetchall()
+    
+    # Get excused dates
+    cursor.execute("SELECT date FROM excused_days")
+    excused_rows = cursor.fetchall()
+    
+    conn.close()
+    
+    logged_dates = set(row['date'] for row in logged_rows)
+    excused_dates = set(row['date'] for row in excused_rows)
+    
+    if not logged_rows:
+        return []  # No history yet, nothing is "missed"
+    
+    # Find the most recent logged date
+    last_logged = max(logged_dates)
+    last_logged_date = datetime.strptime(last_logged, "%Y-%m-%d").date()
+    
+    # Check each weekday between last logged and today
+    missed = []
+    current_date = last_logged_date + timedelta(days=1)
+    today = datetime.now().date()
+    
+    while current_date < today:  # Don't include today - they might log later
+        date_str = current_date.strftime("%Y-%m-%d")
+        weekday = current_date.weekday()
+        
+        # Only count weekdays that aren't logged or excused
+        if weekday < 5:  # Monday-Friday
+            if date_str not in logged_dates and date_str not in excused_dates:
+                missed.append(date_str)
+        
+        current_date += timedelta(days=1)
+    
+    return missed
+
+
 def get_current_streak() -> int:
     """
     Calculate the current logging streak.
-    A streak is consecutive days (excluding weekends) with logged time.
+    A streak is consecutive days (excluding weekends and excused days) with logged time.
     
     Returns:
         Number of consecutive days in the current streak
@@ -162,17 +252,19 @@ def get_current_streak() -> int:
     conn = get_connection()
     cursor = conn.cursor()
     
-    cursor.execute("""
-        SELECT date FROM daily_logs ORDER BY date DESC
-    """)
+    cursor.execute("SELECT date FROM daily_logs ORDER BY date DESC")
+    logged_rows = cursor.fetchall()
     
-    rows = cursor.fetchall()
+    cursor.execute("SELECT date FROM excused_days")
+    excused_rows = cursor.fetchall()
+    
     conn.close()
     
-    if not rows:
+    if not logged_rows:
         return 0
     
-    logged_dates = set(row['date'] for row in rows)
+    logged_dates = set(row['date'] for row in logged_rows)
+    excused_dates = set(row['date'] for row in excused_rows)
     
     # Start from today and count backwards
     streak = 0
@@ -184,6 +276,11 @@ def get_current_streak() -> int:
         
         # Skip weekends (Saturday=5, Sunday=6)
         if weekday >= 5:
+            current_date -= timedelta(days=1)
+            continue
+        
+        # Skip excused days (PTO, holidays)
+        if date_str in excused_dates:
             current_date -= timedelta(days=1)
             continue
         

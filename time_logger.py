@@ -12,6 +12,103 @@ import database
 import jira_sync
 
 
+class MissedDaysDialog:
+    """Dialog shown when there are missed days that would break the streak."""
+    
+    def __init__(self, parent, missed_days: list[str]):
+        self.result = None  # Will be 'pto', 'holiday', 'reset', or 'cancel'
+        self.missed_days = missed_days
+        
+        self.dialog = tk.Toplevel(parent)
+        self.dialog.title("Missed Days Detected")
+        self.dialog.geometry("450x350")
+        self.dialog.resizable(False, False)
+        self.dialog.transient(parent)
+        self.dialog.grab_set()
+        
+        # Center on parent
+        self.dialog.geometry(f"+{parent.winfo_x() + 50}+{parent.winfo_y() + 50}")
+        
+        self._build_ui()
+    
+    def _build_ui(self):
+        main_frame = ttk.Frame(self.dialog, padding="20")
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Header
+        ttk.Label(
+            main_frame,
+            text="📅 Missed Days Detected",
+            font=("Segoe UI", 14, "bold")
+        ).pack(pady=(0, 10))
+        
+        # Explanation
+        days_text = ", ".join(self.missed_days) if len(self.missed_days) <= 3 else \
+            f"{self.missed_days[0]} ... {self.missed_days[-1]} ({len(self.missed_days)} days)"
+        
+        ttk.Label(
+            main_frame,
+            text=f"You haven't logged time for:\n{days_text}",
+            font=("Segoe UI", 10),
+            justify=tk.CENTER
+        ).pack(pady=(0, 15))
+        
+        ttk.Label(
+            main_frame,
+            text="Was this time off, or did you forget to log?",
+            font=("Segoe UI", 10)
+        ).pack(pady=(0, 15))
+        
+        # Buttons frame
+        btn_frame = ttk.Frame(main_frame)
+        btn_frame.pack(fill=tk.X, pady=10)
+        
+        ttk.Button(
+            btn_frame,
+            text="🏖️ PTO / Vacation",
+            command=lambda: self._select('pto'),
+            width=20
+        ).pack(pady=5)
+        
+        ttk.Button(
+            btn_frame,
+            text="🎉 Company Holiday",
+            command=lambda: self._select('holiday'),
+            width=20
+        ).pack(pady=5)
+        
+        ttk.Button(
+            btn_frame,
+            text="😅 I Forgot - Reset Streak",
+            command=lambda: self._select('reset'),
+            width=20
+        ).pack(pady=5)
+        
+        ttk.Button(
+            btn_frame,
+            text="Ask Me Later",
+            command=lambda: self._select('cancel'),
+            width=20
+        ).pack(pady=5)
+        
+        # Info text
+        ttk.Label(
+            main_frame,
+            text="(PTO/Holiday will preserve your streak)",
+            font=("Segoe UI", 8),
+            foreground="gray"
+        ).pack(pady=(10, 0))
+    
+    def _select(self, choice: str):
+        self.result = choice
+        self.dialog.destroy()
+    
+    def show(self) -> str:
+        """Show the dialog and return the user's choice."""
+        self.dialog.wait_window()
+        return self.result
+
+
 class TimeEntryRow:
     """A single row in the time entry form."""
     
@@ -98,6 +195,9 @@ class TimeLoggerApp:
         
         self._build_ui()
         self._add_entry_row()  # Start with one row
+        
+        # Check for missed days after UI is built
+        self.root.after(100, self._check_missed_days)
     
     def _build_ui(self):
         # Main container with padding
@@ -246,6 +346,51 @@ class TimeLoggerApp:
             row.delete_btn.grid(row=i, column=3)
             row.row_num = i
     
+    def _check_missed_days(self):
+        """Check for missed days and prompt user if streak would be broken."""
+        missed = database.get_missed_days()
+        
+        if not missed:
+            return  # No missed days, streak is intact!
+        
+        # Show dialog asking what to do
+        dialog = MissedDaysDialog(self.root, missed)
+        choice = dialog.show()
+        
+        if choice == 'pto':
+            for date in missed:
+                database.add_excused_day(date, 'PTO')
+            self._update_streak_display()
+            messagebox.showinfo(
+                "Days Marked as PTO",
+                f"Marked {len(missed)} day(s) as PTO.\nYour streak is preserved! 🎉"
+            )
+        
+        elif choice == 'holiday':
+            for date in missed:
+                database.add_excused_day(date, 'Holiday')
+            self._update_streak_display()
+            messagebox.showinfo(
+                "Days Marked as Holiday",
+                f"Marked {len(missed)} day(s) as company holiday.\nYour streak is preserved! 🎉"
+            )
+        
+        elif choice == 'reset':
+            # Don't mark as excused - streak will naturally reset
+            self._update_streak_display()
+            messagebox.showinfo(
+                "Streak Reset",
+                "No worries! Start fresh today. 💪"
+            )
+        
+        # 'cancel' - do nothing, ask again next time
+    
+    def _update_streak_display(self):
+        """Refresh the streak label."""
+        streak = database.get_current_streak()
+        streak_text = f"🔥 {streak} day streak!" if streak > 0 else "Start your streak today!"
+        self.streak_label.config(text=streak_text)
+    
     def _get_valid_entries(self) -> list[dict]:
         """Get all valid entries from the form."""
         entries = []
@@ -285,9 +430,7 @@ class TimeLoggerApp:
         self.status_var.set(f"✓ Saved {len(saved_ids)} entries locally")
         
         # Update streak display
-        streak = database.get_current_streak()
-        streak_text = f"🔥 {streak} day streak!" if streak > 0 else "Start your streak today!"
-        self.streak_label.config(text=streak_text)
+        self._update_streak_display()
         
         return saved_ids
     
