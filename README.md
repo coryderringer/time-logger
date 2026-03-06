@@ -113,6 +113,18 @@ Your current streak is shown in the popup header:
 
 The Friday summary shows your weekly stats and progress.
 
+### PTO & Holidays
+
+Don't worry about breaking your streak when you're out of office!
+
+When you open the app after missing workdays, you'll see a prompt:
+- **🏖️ PTO / Vacation** - Marks missed days as PTO (streak preserved)
+- **🎉 Company Holiday** - Marks missed days as holiday (streak preserved)
+- **😅 I Forgot - Reset Streak** - Acknowledges missed days (streak resets)
+- **Ask Me Later** - Dismisses until next time
+
+Excused days are stored locally and won't count against your streak.
+
 ## Troubleshooting
 
 ### "Jira not configured" error
@@ -168,6 +180,21 @@ time-logger/
 - **API tokens** should have minimal required permissions
 - **Local database** contains only ticket IDs, hours, and descriptions
 - **No passwords or sensitive data** are stored in the database
+
+## Future Enhancements
+
+Ideas for future development:
+
+### Favorite Tickets
+Save frequently-used ticket IDs (e.g., admin time, meetings, training) for quick selection. Instead of typing `DHI-9999` every day, pick from a dropdown of your saved favorites.
+
+### Auto-Populate PTO Time
+When marking days as PTO, optionally create a time entry for the company's PTO ticket automatically. No more forgetting to log vacation time!
+
+### Outlook Calendar Integration
+Detect PTO and holidays automatically from your Outlook calendar.
+
+---
 
 ## Contributing
 
