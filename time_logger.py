@@ -7,9 +7,43 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 from datetime import datetime
 from typing import Callable, Optional, List, Dict
+import sys
 
 import database
 import jira_sync
+
+
+def flash_window(hwnd, count=5):
+    """Flash the taskbar icon to grab attention (Windows only)."""
+    if sys.platform != "win32":
+        return
+    
+    try:
+        import ctypes
+        from ctypes import wintypes
+        
+        class FLASHWINFO(ctypes.Structure):
+            _fields_ = [
+                ('cbSize', wintypes.UINT),
+                ('hwnd', wintypes.HWND),
+                ('dwFlags', wintypes.DWORD),
+                ('uCount', wintypes.UINT),
+                ('dwTimeout', wintypes.DWORD),
+            ]
+        
+        FLASHW_ALL = 0x03
+        FLASHW_TIMERNOFG = 0x0C
+        
+        fw = FLASHWINFO()
+        fw.cbSize = ctypes.sizeof(FLASHWINFO)
+        fw.hwnd = hwnd
+        fw.dwFlags = FLASHW_ALL | FLASHW_TIMERNOFG
+        fw.uCount = count
+        fw.dwTimeout = 0
+        
+        ctypes.windll.user32.FlashWindowEx(ctypes.byref(fw))
+    except Exception:
+        pass  # Fail silently if flashing doesn't work
 
 
 class MissedDaysDialog:
@@ -180,9 +214,16 @@ class TimeLoggerApp:
         self.root.geometry("600x500")
         self.root.minsize(500, 400)
         
-        # Make window stay on top initially
+        # Make window AGGRESSIVELY visible
         self.root.attributes('-topmost', True)
-        self.root.after(100, lambda: self.root.attributes('-topmost', False))
+        self.root.lift()
+        self.root.focus_force()
+        
+        # Flash the taskbar to get attention
+        self._flash_window()
+        
+        # Stay on top for 3 seconds, then allow other windows
+        self.root.after(3000, lambda: self.root.attributes('-topmost', False))
         
         # Style configuration
         style = ttk.Style()
@@ -198,6 +239,15 @@ class TimeLoggerApp:
         
         # Check for missed days after UI is built
         self.root.after(100, self._check_missed_days)
+    
+    def _flash_window(self):
+        """Flash the taskbar icon to grab attention."""
+        try:
+            # Get the window handle (HWND) from tkinter
+            hwnd = int(self.root.wm_frame(), 16)
+            flash_window(hwnd, count=5)
+        except Exception:
+            pass  # Fail silently
     
     def _build_ui(self):
         # Main container with padding
