@@ -163,7 +163,7 @@ def add_worklog(
         return False, f"Failed to add worklog: {str(e)}", None
 
 
-def sync_entries(entries: list[dict], callback=None) -> dict:
+def sync_entries(entries, callback=None):
     """
     Sync a list of time entries to Jira.
     

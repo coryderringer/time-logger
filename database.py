@@ -6,7 +6,7 @@ Uses SQLite to store time entries and streak tracking.
 import sqlite3
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List, Dict, Set
 
 # Database file lives in the same directory as this script
 DB_PATH = Path(__file__).parent / "time_log.db"
@@ -102,7 +102,7 @@ def add_entry(date: str, ticket_id: str, hours: float, description: str = "") ->
     return entry_id
 
 
-def get_entries_for_date(date: str) -> list[dict]:
+def get_entries_for_date(date: str) -> List[Dict]:
     """Get all entries for a specific date."""
     conn = get_connection()
     cursor = conn.cursor()
@@ -117,7 +117,7 @@ def get_entries_for_date(date: str) -> list[dict]:
     return [dict(row) for row in rows]
 
 
-def get_unsent_entries() -> list[dict]:
+def get_unsent_entries() -> List[Dict]:
     """Get all entries that haven't been sent to Jira yet."""
     conn = get_connection()
     cursor = conn.cursor()
@@ -179,7 +179,7 @@ def add_excused_day(date: str, reason: str):
     conn.close()
 
 
-def get_excused_days() -> set[str]:
+def get_excused_days() -> Set[str]:
     """Get all excused dates as a set of date strings."""
     conn = get_connection()
     cursor = conn.cursor()
@@ -191,7 +191,7 @@ def get_excused_days() -> set[str]:
     return set(row['date'] for row in rows)
 
 
-def get_missed_days() -> list[str]:
+def get_missed_days() -> List[str]:
     """
     Get weekdays between last logged day and today that aren't logged or excused.
     These are days that would break the streak.

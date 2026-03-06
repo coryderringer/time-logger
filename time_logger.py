@@ -6,7 +6,7 @@ A tkinter GUI that helps you log time to Jira tickets.
 import tkinter as tk
 from tkinter import ttk, messagebox
 from datetime import datetime
-from typing import Callable
+from typing import Callable, Optional, List, Dict
 
 import database
 import jira_sync
@@ -15,7 +15,7 @@ import jira_sync
 class MissedDaysDialog:
     """Dialog shown when there are missed days that would break the streak."""
     
-    def __init__(self, parent, missed_days: list[str]):
+    def __init__(self, parent, missed_days: List[str]):
         self.result = None  # Will be 'pto', 'holiday', 'reset', or 'cancel'
         self.missed_days = missed_days
         
@@ -145,7 +145,7 @@ class TimeEntryRow:
         self.desc_entry.destroy()
         self.delete_btn.destroy()
     
-    def get_data(self) -> dict | None:
+    def get_data(self) -> Optional[Dict]:
         """Get the entry data, or None if row is empty/invalid."""
         ticket = self.ticket_var.get().strip().upper()
         hours_str = self.hours_var.get().strip()
@@ -190,7 +190,7 @@ class TimeLoggerApp:
         style.configure("Streak.TLabel", font=("Segoe UI", 11))
         style.configure("Status.TLabel", font=("Segoe UI", 9))
         
-        self.entry_rows: list[TimeEntryRow] = []
+        self.entry_rows = []  # List of TimeEntryRow
         self.date_var = tk.StringVar(value=datetime.now().strftime("%Y-%m-%d"))
         
         self._build_ui()
@@ -391,7 +391,7 @@ class TimeLoggerApp:
         streak_text = f"🔥 {streak} day streak!" if streak > 0 else "Start your streak today!"
         self.streak_label.config(text=streak_text)
     
-    def _get_valid_entries(self) -> list[dict]:
+    def _get_valid_entries(self) -> List[Dict]:
         """Get all valid entries from the form."""
         entries = []
         for row in self.entry_rows:
@@ -400,7 +400,7 @@ class TimeLoggerApp:
                 entries.append(data)
         return entries
     
-    def _save_entries(self) -> list[int]:
+    def _save_entries(self) -> List[int]:
         """Save entries to the local database."""
         entries = self._get_valid_entries()
         
