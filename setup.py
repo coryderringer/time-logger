@@ -38,6 +38,23 @@ def run_powershell(command: str, capture: bool = True) -> tuple[bool, str]:
         return False, str(e)
 
 
+def get_pythonw_path():
+    """Get the full path to pythonw.exe (or python.exe as fallback)."""
+    import sys
+    python_path = sys.executable
+    
+    # Try to find pythonw.exe in the same directory
+    python_dir = Path(python_path).parent
+    pythonw_path = python_dir / "pythonw.exe"
+    
+    if pythonw_path.exists():
+        return str(pythonw_path)
+    
+    # For Microsoft Store Python, pythonw might be in a different location
+    # Fall back to python.exe (will show console briefly)
+    return python_path
+
+
 def install_tasks():
     """Create the scheduled tasks."""
     print("=" * 50)
@@ -45,6 +62,11 @@ def install_tasks():
     print("=" * 50)
     print()
     print(f"Project path: {PROJECT_PATH}")
+    print()
+    
+    # Get Python path
+    python_exe = get_pythonw_path()
+    print(f"Python executable: {python_exe}")
     print()
     
     # Check Python is available
@@ -62,7 +84,7 @@ def install_tasks():
     # Task 1: Daily at 3 PM
     print("1. TimeLogger-Daily (3:00 PM, Mon-Fri)")
     daily_cmd = f'''
-$action = New-ScheduledTaskAction -Execute "pythonw.exe" -Argument '"{PROJECT_PATH}\\time_logger.py"' -WorkingDirectory "{PROJECT_PATH}"
+$action = New-ScheduledTaskAction -Execute "{python_exe}" -Argument '"{PROJECT_PATH}\\time_logger.py"' -WorkingDirectory "{PROJECT_PATH}"
 $trigger = New-ScheduledTaskTrigger -Weekly -WeeksInterval 1 -DaysOfWeek Monday,Tuesday,Wednesday,Thursday,Friday -At 3:00PM
 $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
 Register-ScheduledTask -TaskName "TimeLogger-Daily" -Action $action -Trigger $trigger -Settings $settings -Description "Opens the time logger popup" -Force | Out-Null
@@ -76,7 +98,7 @@ Register-ScheduledTask -TaskName "TimeLogger-Daily" -Action $action -Trigger $tr
     # Task 2: Weekly summary on Fridays
     print("2. TimeLogger-WeeklySummary (4:00 PM, Fridays)")
     weekly_cmd = f'''
-$action = New-ScheduledTaskAction -Execute "pythonw.exe" -Argument '"{PROJECT_PATH}\\weekly_summary.py"' -WorkingDirectory "{PROJECT_PATH}"
+$action = New-ScheduledTaskAction -Execute "{python_exe}" -Argument '"{PROJECT_PATH}\\weekly_summary.py"' -WorkingDirectory "{PROJECT_PATH}"
 $trigger = New-ScheduledTaskTrigger -Weekly -WeeksInterval 1 -DaysOfWeek Friday -At 4:00PM
 $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
 Register-ScheduledTask -TaskName "TimeLogger-WeeklySummary" -Action $action -Trigger $trigger -Settings $settings -Description "Shows weekly summary" -Force | Out-Null
