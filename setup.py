@@ -3,10 +3,11 @@ Time Logger Setup Script
 Run this to configure scheduled tasks for the time logger.
 
 Usage:
-    python setup.py install    - Create scheduled tasks (3pm daily, 4pm Friday)
-    python setup.py uninstall  - Remove scheduled tasks
-    python setup.py test       - Test the Jira connection
-    python setup.py status     - Show current task status
+    python setup.py install              - Create scheduled tasks (3pm daily, 4pm Friday)
+    python setup.py install --time 4:30PM - Use a custom reminder time
+    python setup.py uninstall            - Remove scheduled tasks
+    python setup.py test                 - Test the Jira connection
+    python setup.py status               - Show current task status
 """
 
 import subprocess
@@ -55,8 +56,26 @@ def get_pythonw_path():
     return python_path
 
 
+def parse_time_arg():
+    """Parse --time argument if provided, default to 3:00PM."""
+    import re
+    for i, arg in enumerate(sys.argv):
+        if arg == "--time" and i + 1 < len(sys.argv):
+            time_str = sys.argv[i + 1]
+            # Validate format (e.g., 3:00PM, 4:30PM, 2:00PM)
+            if re.match(r'^\d{1,2}:\d{2}(AM|PM)$', time_str, re.IGNORECASE):
+                return time_str.upper()
+            else:
+                print(f"Invalid time format: {time_str}")
+                print("Use format like: 3:00PM, 4:30PM, 10:00AM")
+                sys.exit(1)
+    return "3:00PM"
+
+
 def install_tasks():
     """Create the scheduled tasks."""
+    reminder_time = parse_time_arg()
+    
     print("=" * 50)
     print("⏱️  TIME LOGGER - SETUP")
     print("=" * 50)
@@ -81,11 +100,11 @@ def install_tasks():
     print("Creating scheduled tasks...")
     print()
     
-    # Task 1: Daily at 3 PM
-    print("1. TimeLogger-Daily (3:00 PM, Mon-Fri)")
+    # Task 1: Daily reminder
+    print(f"1. TimeLogger-Daily ({reminder_time}, Mon-Fri)")
     daily_cmd = f'''
 $action = New-ScheduledTaskAction -Execute "{python_exe}" -Argument '"{PROJECT_PATH}\\time_logger.py"' -WorkingDirectory "{PROJECT_PATH}"
-$trigger = New-ScheduledTaskTrigger -Weekly -WeeksInterval 1 -DaysOfWeek Monday,Tuesday,Wednesday,Thursday,Friday -At 3:00PM
+$trigger = New-ScheduledTaskTrigger -Weekly -WeeksInterval 1 -DaysOfWeek Monday,Tuesday,Wednesday,Thursday,Friday -At {reminder_time}
 $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
 Register-ScheduledTask -TaskName "TimeLogger-Daily" -Action $action -Trigger $trigger -Settings $settings -Description "Opens the time logger popup" -Force | Out-Null
 '''
@@ -113,7 +132,7 @@ Register-ScheduledTask -TaskName "TimeLogger-WeeklySummary" -Action $action -Tri
     print("=" * 50)
     print("✓ Setup complete!")
     print()
-    print("The time logger will now pop up at 3:00 PM on weekdays.")
+    print(f"The time logger will now pop up at {reminder_time} on weekdays.")
     print("You'll see a weekly summary at 4:00 PM on Fridays.")
     print()
     print("To test it now, run:")
