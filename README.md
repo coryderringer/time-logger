@@ -76,11 +76,21 @@ This creates two Windows scheduled tasks:
 
 1. The popup appears at 3 PM (or run `python time_logger.py` anytime)
 2. Enter your time:
-   - **Ticket ID**: e.g., `DHI-1234`
+   - **Ticket ID**: Type a ticket ID or select from saved tickets dropdown
    - **Hours**: e.g., `2` or `1.5`
    - **Description**: (optional) what you worked on
 3. Click **+ Add Another Entry** for multiple tickets
 4. Click **Save & Send to Jira**
+
+### Saved Tickets
+
+Tired of typing the same ticket IDs every day? Save them for quick access!
+
+- **To save a ticket**: Enter a ticket ID, then click the **☆ star button** and give it a nickname (e.g., "Admin", "CCF Aetna")
+- **To use a saved ticket**: Click the dropdown and select from your saved tickets
+- **To manage saved tickets**: Click **⚙ Manage Saved Tickets** to view or delete saved tickets
+
+Saved tickets appear in the dropdown as `Nickname (DHI-1234)` and are sorted by most recently used.
 
 ### Commands
 

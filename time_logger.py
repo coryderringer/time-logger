@@ -146,42 +146,83 @@ class MissedDaysDialog:
 class TimeEntryRow:
     """A single row in the time entry form."""
     
-    def __init__(self, parent: tk.Frame, row_num: int, on_delete: Callable):
+    def __init__(self, parent: tk.Frame, row_num: int, on_delete: Callable, on_save_ticket: Callable):
         self.parent = parent
         self.row_num = row_num
         self.on_delete = on_delete
+        self.on_save_ticket = on_save_ticket
         
-        # Ticket ID
+        # Ticket ID (combobox with saved tickets)
         self.ticket_var = tk.StringVar()
-        self.ticket_entry = ttk.Entry(parent, textvariable=self.ticket_var, width=15)
-        self.ticket_entry.grid(row=row_num, column=0, padx=2, pady=2, sticky="w")
+        self.ticket_combo = ttk.Combobox(parent, textvariable=self.ticket_var, width=18)
+        self.ticket_combo.grid(row=row_num, column=0, padx=2, pady=2, sticky="w")
+        self.refresh_saved_tickets()
+        
+        # Bind selection to extract ticket ID from "Nickname (DHI-1234)" format
+        self.ticket_combo.bind('<<ComboboxSelected>>', self._on_ticket_selected)
+        
+        # Save ticket button (star)
+        self.save_btn = ttk.Button(parent, text="☆", width=2, command=self._save_ticket)
+        self.save_btn.grid(row=row_num, column=1, padx=1, pady=2)
         
         # Hours
         self.hours_var = tk.StringVar()
         self.hours_entry = ttk.Entry(parent, textvariable=self.hours_var, width=8)
-        self.hours_entry.grid(row=row_num, column=1, padx=2, pady=2, sticky="w")
+        self.hours_entry.grid(row=row_num, column=2, padx=2, pady=2, sticky="w")
         
         # Description
         self.desc_var = tk.StringVar()
-        self.desc_entry = ttk.Entry(parent, textvariable=self.desc_var, width=40)
-        self.desc_entry.grid(row=row_num, column=2, padx=2, pady=2, sticky="we")
+        self.desc_entry = ttk.Entry(parent, textvariable=self.desc_var, width=35)
+        self.desc_entry.grid(row=row_num, column=3, padx=2, pady=2, sticky="we")
         
         # Delete button
         self.delete_btn = ttk.Button(parent, text="×", width=3, command=self._delete)
-        self.delete_btn.grid(row=row_num, column=3, padx=2, pady=2)
+        self.delete_btn.grid(row=row_num, column=4, padx=2, pady=2)
     
     def _delete(self):
         self.on_delete(self)
     
+    def _save_ticket(self):
+        """Save the current ticket for quick selection."""
+        ticket_id = self._extract_ticket_id(self.ticket_var.get())
+        if ticket_id:
+            self.on_save_ticket(ticket_id)
+    
+    def _on_ticket_selected(self, event):
+        """When a saved ticket is selected, extract just the ticket ID."""
+        selected = self.ticket_var.get()
+        ticket_id = self._extract_ticket_id(selected)
+        if ticket_id != selected:
+            self.ticket_var.set(ticket_id)
+    
+    def _extract_ticket_id(self, value: str) -> str:
+        """Extract ticket ID from 'Nickname (DHI-1234)' format or return as-is."""
+        value = value.strip()
+        if '(' in value and value.endswith(')'):
+            # Extract ID from "Nickname (DHI-1234)" format
+            start = value.rfind('(') + 1
+            end = value.rfind(')')
+            return value[start:end].strip()
+        return value.upper()
+    
+    def refresh_saved_tickets(self):
+        """Refresh the dropdown with saved tickets."""
+        saved = database.get_saved_tickets()
+        # Format: "Nickname (DHI-1234)"
+        values = [f"{t['nickname']} ({t['ticket_id']})" for t in saved]
+        self.ticket_combo['values'] = values
+    
     def destroy(self):
-        self.ticket_entry.destroy()
+        self.ticket_combo.destroy()
+        self.save_btn.destroy()
         self.hours_entry.destroy()
         self.desc_entry.destroy()
         self.delete_btn.destroy()
     
     def get_data(self) -> Optional[Dict]:
         """Get the entry data, or None if row is empty/invalid."""
-        ticket = self.ticket_var.get().strip().upper()
+        raw_ticket = self.ticket_var.get().strip()
+        ticket = self._extract_ticket_id(raw_ticket)
         hours_str = self.hours_var.get().strip()
         desc = self.desc_var.get().strip()
         
@@ -194,6 +235,9 @@ class TimeEntryRow:
                 return None
         except ValueError:
             return None
+        
+        # Update last_used for saved tickets
+        database.update_ticket_last_used(ticket)
         
         return {
             'ticket_id': ticket,
@@ -211,8 +255,8 @@ class TimeLoggerApp:
     def __init__(self):
         self.root = tk.Tk()
         self.root.title("⏱️ Time Logger")
-        self.root.geometry("600x500")
-        self.root.minsize(500, 400)
+        self.root.geometry("620x520")
+        self.root.minsize(520, 420)
         
         # Make window AGGRESSIVELY visible
         self.root.attributes('-topmost', True)
@@ -295,14 +339,15 @@ class TimeLoggerApp:
         self.jira_status = ttk.Label(date_frame, text=status_text, style="Status.TLabel")
         self.jira_status.pack(side=tk.RIGHT)
         
-        # Column headers
+        # Column headers (aligned with entry row columns)
         headers_frame = ttk.Frame(main_frame)
         headers_frame.pack(fill=tk.X)
         
-        ttk.Label(headers_frame, text="Ticket ID", width=15).grid(row=0, column=0, sticky="w", padx=2)
-        ttk.Label(headers_frame, text="Hours", width=8).grid(row=0, column=1, sticky="w", padx=2)
-        ttk.Label(headers_frame, text="Description (optional)", width=40).grid(row=0, column=2, sticky="w", padx=2)
-        ttk.Label(headers_frame, text="", width=3).grid(row=0, column=3)
+        ttk.Label(headers_frame, text="Ticket ID", width=21).grid(row=0, column=0, sticky="w", padx=2)
+        ttk.Label(headers_frame, text="", width=3).grid(row=0, column=1, padx=1)  # Star button column
+        ttk.Label(headers_frame, text="Hours", width=8).grid(row=0, column=2, sticky="w", padx=2)
+        ttk.Label(headers_frame, text="Description (optional)", width=35).grid(row=0, column=3, sticky="w", padx=2)
+        ttk.Label(headers_frame, text="", width=3).grid(row=0, column=4)
         
         # Scrollable entry area
         canvas_frame = ttk.Frame(main_frame)
@@ -312,7 +357,7 @@ class TimeLoggerApp:
         scrollbar = ttk.Scrollbar(canvas_frame, orient="vertical", command=self.canvas.yview)
         
         self.entries_frame = ttk.Frame(self.canvas)
-        self.entries_frame.columnconfigure(2, weight=1)
+        self.entries_frame.columnconfigure(3, weight=1)  # Description column expands
         
         self.canvas_window = self.canvas.create_window((0, 0), window=self.entries_frame, anchor="nw")
         
@@ -333,6 +378,12 @@ class TimeLoggerApp:
             text="+ Add Another Entry", 
             command=self._add_entry_row
         ).pack(side=tk.LEFT)
+        
+        ttk.Button(
+            add_frame,
+            text="⚙ Manage Saved Tickets",
+            command=self._manage_saved_tickets
+        ).pack(side=tk.RIGHT)
         
         # Action buttons
         button_frame = ttk.Frame(main_frame)
@@ -356,10 +407,10 @@ class TimeLoggerApp:
             command=self.root.destroy
         ).pack(side=tk.RIGHT)
         
-        # Status bar
+        # Status bar (with extra bottom padding to prevent cutoff)
         self.status_var = tk.StringVar(value="Ready")
         status_bar = ttk.Label(main_frame, textvariable=self.status_var, style="Status.TLabel")
-        status_bar.pack(fill=tk.X, pady=(10, 0))
+        status_bar.pack(fill=tk.X, pady=(10, 10))
     
     def _on_frame_configure(self, event):
         self.canvas.configure(scrollregion=self.canvas.bbox("all"))
@@ -369,11 +420,130 @@ class TimeLoggerApp:
     
     def _add_entry_row(self):
         row_num = len(self.entry_rows)
-        row = TimeEntryRow(self.entries_frame, row_num, self._delete_entry_row)
+        row = TimeEntryRow(self.entries_frame, row_num, self._delete_entry_row, self._save_ticket_dialog)
         self.entry_rows.append(row)
         
         # Focus the new ticket field
-        row.ticket_entry.focus_set()
+        row.ticket_combo.focus_set()
+    
+    def _save_ticket_dialog(self, ticket_id: str):
+        """Show dialog to save a ticket with a nickname."""
+        if not ticket_id:
+            messagebox.showwarning("No Ticket", "Enter a ticket ID first, then click the star to save it.")
+            return
+        
+        # Simple dialog for nickname
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Save Ticket")
+        dialog.geometry("300x120")
+        dialog.transient(self.root)
+        dialog.grab_set()
+        
+        ttk.Label(dialog, text=f"Save {ticket_id} with nickname:").pack(pady=(15, 5))
+        
+        nickname_var = tk.StringVar()
+        nickname_entry = ttk.Entry(dialog, textvariable=nickname_var, width=25)
+        nickname_entry.pack(pady=5)
+        nickname_entry.focus_set()
+        
+        def save():
+            nickname = nickname_var.get().strip()
+            if nickname:
+                database.save_ticket(ticket_id, nickname)
+                # Refresh all row dropdowns
+                for row in self.entry_rows:
+                    row.refresh_saved_tickets()
+                dialog.destroy()
+                messagebox.showinfo("Saved!", f"Saved '{nickname}' ({ticket_id}) for quick access.")
+            else:
+                messagebox.showwarning("No Nickname", "Please enter a nickname for this ticket.")
+        
+        btn_frame = ttk.Frame(dialog)
+        btn_frame.pack(pady=10)
+        ttk.Button(btn_frame, text="Save", command=save).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text="Cancel", command=dialog.destroy).pack(side=tk.LEFT, padx=5)
+        
+        # Allow Enter to save
+        nickname_entry.bind('<Return>', lambda e: save())
+    
+    def _manage_saved_tickets(self):
+        """Open dialog to manage (view/delete) saved tickets."""
+        saved = database.get_saved_tickets()
+        
+        if not saved:
+            messagebox.showinfo("No Saved Tickets", "You haven't saved any tickets yet.\n\nTo save a ticket, enter a ticket ID and click the ☆ star button.")
+            return
+        
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Manage Saved Tickets")
+        dialog.geometry("400x300")
+        dialog.transient(self.root)
+        dialog.grab_set()
+        
+        main_frame = ttk.Frame(dialog, padding="15")
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        
+        ttk.Label(main_frame, text="Saved Tickets", font=("Segoe UI", 12, "bold")).pack(pady=(0, 10))
+        
+        # Scrollable list
+        list_frame = ttk.Frame(main_frame)
+        list_frame.pack(fill=tk.BOTH, expand=True)
+        
+        canvas = tk.Canvas(list_frame, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(list_frame, orient="vertical", command=canvas.yview)
+        tickets_frame = ttk.Frame(canvas)
+        
+        canvas.configure(yscrollcommand=scrollbar.set)
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        canvas_window = canvas.create_window((0, 0), window=tickets_frame, anchor="nw")
+        
+        def on_frame_configure(event):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+        
+        def on_canvas_configure(event):
+            canvas.itemconfig(canvas_window, width=event.width)
+        
+        tickets_frame.bind("<Configure>", on_frame_configure)
+        canvas.bind("<Configure>", on_canvas_configure)
+        
+        def refresh_list():
+            # Clear existing items
+            for widget in tickets_frame.winfo_children():
+                widget.destroy()
+            
+            current_saved = database.get_saved_tickets()
+            
+            if not current_saved:
+                dialog.destroy()
+                return
+            
+            for ticket in current_saved:
+                row = ttk.Frame(tickets_frame)
+                row.pack(fill=tk.X, pady=2)
+                
+                ttk.Label(
+                    row, 
+                    text=f"{ticket['nickname']} ({ticket['ticket_id']})",
+                    width=35
+                ).pack(side=tk.LEFT, padx=5)
+                
+                def make_delete(tid=ticket['ticket_id'], nick=ticket['nickname']):
+                    def delete():
+                        if messagebox.askyesno("Delete?", f"Remove '{nick}' from saved tickets?"):
+                            database.delete_saved_ticket(tid)
+                            # Refresh all dropdowns
+                            for entry_row in self.entry_rows:
+                                entry_row.refresh_saved_tickets()
+                            refresh_list()
+                    return delete
+                
+                ttk.Button(row, text="🗑", width=3, command=make_delete()).pack(side=tk.RIGHT, padx=5)
+        
+        refresh_list()
+        
+        ttk.Button(main_frame, text="Done", command=dialog.destroy).pack(pady=(10, 0))
     
     def _delete_entry_row(self, row: TimeEntryRow):
         if len(self.entry_rows) <= 1:
@@ -390,10 +560,11 @@ class TimeLoggerApp:
     def _reindex_rows(self):
         # Rebuild row positions after deletion
         for i, row in enumerate(self.entry_rows):
-            row.ticket_entry.grid(row=i, column=0)
-            row.hours_entry.grid(row=i, column=1)
-            row.desc_entry.grid(row=i, column=2)
-            row.delete_btn.grid(row=i, column=3)
+            row.ticket_combo.grid(row=i, column=0)
+            row.save_btn.grid(row=i, column=1)
+            row.hours_entry.grid(row=i, column=2)
+            row.desc_entry.grid(row=i, column=3)
+            row.delete_btn.grid(row=i, column=4)
             row.row_num = i
     
     def _check_missed_days(self):

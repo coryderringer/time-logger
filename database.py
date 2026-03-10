@@ -64,6 +64,16 @@ def init_db():
         )
     """)
     
+    # Saved tickets for quick selection
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS saved_tickets (
+            ticket_id TEXT PRIMARY KEY,
+            nickname TEXT NOT NULL,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            last_used TEXT
+        )
+    """)
+    
     conn.commit()
     conn.close()
 
@@ -385,6 +395,73 @@ def get_month_stats(year: int = None, month: int = None) -> dict:
     }
 
 
+# ============================================================
+# Saved Tickets
+# ============================================================
+
+def save_ticket(ticket_id: str, nickname: str):
+    """
+    Save a ticket for quick selection.
+    
+    Args:
+        ticket_id: Jira ticket ID (e.g., "DHI-1234")
+        nickname: Display name (e.g., "Admin", "CCF Aetna")
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute("""
+        INSERT OR REPLACE INTO saved_tickets (ticket_id, nickname, created_at, last_used)
+        VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+    """, (ticket_id.upper().strip(), nickname.strip()))
+    
+    conn.commit()
+    conn.close()
+
+
+def get_saved_tickets() -> List[Dict]:
+    """Get all saved tickets, ordered by most recently used."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute("""
+        SELECT ticket_id, nickname, last_used
+        FROM saved_tickets
+        ORDER BY last_used DESC
+    """)
+    
+    rows = cursor.fetchall()
+    conn.close()
+    
+    return [dict(row) for row in rows]
+
+
+def update_ticket_last_used(ticket_id: str):
+    """Update the last_used timestamp for a ticket."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute("""
+        UPDATE saved_tickets 
+        SET last_used = CURRENT_TIMESTAMP
+        WHERE ticket_id = ?
+    """, (ticket_id.upper().strip(),))
+    
+    conn.commit()
+    conn.close()
+
+
+def delete_saved_ticket(ticket_id: str):
+    """Remove a saved ticket."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute("DELETE FROM saved_tickets WHERE ticket_id = ?", (ticket_id.upper().strip(),))
+    
+    conn.commit()
+    conn.close()
+
+
 # Initialize the database when this module is imported
 init_db()
 
@@ -394,3 +471,4 @@ if __name__ == "__main__":
     print("Database initialized at:", DB_PATH)
     print("Current streak:", get_current_streak())
     print("This week stats:", get_week_stats())
+    print("Saved tickets:", get_saved_tickets())
